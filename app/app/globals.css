@@ -3,10 +3,45 @@
 @tailwind utilities;
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  /* Tweak these 10 tokens to match exact brand later */
+  --brand-bg: 210 20% 98%;
+  --brand-surface: 0 0% 100%;
+  --brand-primary: 224 78% 49%;      /* confident blue */
+  --brand-primary-fg: 0 0% 100%;
+  --brand-text: 222 25% 15%;
+  --brand-subtext: 222 10% 40%;
+  --brand-border: 220 13% 90%;
+  --brand-accent: 271 75% 55%;       /* subtle purple accent */
+  --brand-success: 152 60% 35%;
+  --brand-warn: 36 100% 45%;
+  --brand-danger: 0 75% 50%;
 }
 
+html, body {
+  background: hsl(var(--brand-bg));
+  color: hsl(var(--brand-text));
+}
+
+.btn {
+  @apply inline-flex items-center gap-2 rounded-2xl px-3 py-2 text-sm font-medium shadow-sm transition;
+  background: hsl(var(--brand-primary));
+  color: hsl(var(--brand-primary-fg));
+}
+.btn:hover { filter: brightness(0.96); }
+.btn:disabled { @apply opacity-60 cursor-not-allowed; }
+
+.card {
+  @apply rounded-2xl bg-white shadow-card;
+}
+
+.badge {
+  @apply inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium;
+  background: hsl(var(--brand-border));
+  color: hsl(var(--brand-subtext));
+}
+.badge--ok { background: hsl(var(--brand-success) / 0.12); color: hsl(var(--brand-success)); }
+.badge--warn { background: hsl(var(--brand-warn) / 0.12); color: hsl(var(--brand-warn)); }
+.badge--danger { background: hsl(var(--brand-danger) / 0.12); color: hsl(var(--brand-danger)); }
 @media (prefers-color-scheme: dark) {
   :root {
     --background: #0a0a0a;
