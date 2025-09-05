@@ -1,8 +1,10 @@
+// app/projects/[id]/page.tsx
 import { notFound } from 'next/navigation';
 import { db } from '@/lib/db';
 import AddRoleForm from './AddRoleForm';
-import EditRoleInline from './EditRoleInline';
 import DeleteRoleButton from './DeleteRoleButton';
+import EditRoleInline from './EditRoleInline';
+import AssignPersonSelect from './AssignPersonSelect';
 
 export const dynamic = 'force-dynamic';
 
@@ -15,13 +17,17 @@ function fmt(d?: Date | null) {
 }
 
 export default async function ProjectDetailPage({ params }: { params: { id: string } }) {
-  const project = await db.project.findUnique({
-    where: { id: params.id },
+  const project = await db.project.findFirst({
+    where: { id: params.id, tenantId: 'harvest-default-tenant' },
     include: {
       client: true,
-      rolePlans: { orderBy: [{ startDate: 'asc' }, { createdAt: 'asc' }] },
+      rolePlans: {
+        orderBy: [{ startDate: 'asc' }, { createdAt: 'asc' }],
+        include: { assignedPerson: { select: { id: true, firstName: true, lastName: true, email: true } } },
+      },
     },
   });
+
   if (!project) return notFound();
 
   return (
@@ -33,18 +39,9 @@ export default async function ProjectDetailPage({ params }: { params: { id: stri
           {project.name ?? project.harvestName ?? '(unnamed project)'}
         </h1>
         <p className="text-sm text-neutral-600">
-          Client: {project.client?.name ?? '-'} • Status: {project.isActive ? 'Active' : 'Inactive'}
+          Client: {project.client?.name ?? '-'} • Status: {(project as any).isActive ? 'Active' : 'Inactive'}
         </p>
       </header>
-
-      <section className="rounded-lg bg-white p-4 shadow-sm">
-        <h2 className="font-medium mb-3">Identifiers</h2>
-        <div className="text-sm space-y-1">
-          <div>Project ID: {project.id}</div>
-          {project.harvestId != null && <div>Harvest ID: {project.harvestId}</div>}
-          {project.harvestName && <div>Harvest Name: {project.harvestName}</div>}
-        </div>
-      </section>
 
       <section className="rounded-lg bg-white p-4 shadow-sm space-y-4">
         <h2 className="font-medium mb-3">Role planning</h2>
@@ -58,6 +55,7 @@ export default async function ProjectDetailPage({ params }: { params: { id: stri
               <th className="py-2 text-left">% Allocation</th>
               <th className="py-2 text-left">Billable</th>
               <th className="py-2 text-left">Expected rate</th>
+              <th className="py-2 text-left">Assigned to</th>
               <th className="py-2 text-left">Notes</th>
               <th className="py-2 text-left">Actions</th>
             </tr>
@@ -65,7 +63,7 @@ export default async function ProjectDetailPage({ params }: { params: { id: stri
           <tbody>
             {project.rolePlans.length === 0 ? (
               <tr>
-                <td colSpan={7} className="py-6 text-center text-neutral-500">
+                <td colSpan={8} className="py-6 text-center text-neutral-500">
                   No roles planned yet.
                 </td>
               </tr>
@@ -77,23 +75,29 @@ export default async function ProjectDetailPage({ params }: { params: { id: stri
                   <td className="py-2">{r.allocationPct}%</td>
                   <td className="py-2">{r.billable ? 'Yes' : 'No'}</td>
                   <td className="py-2">
-                    {r.expectedRateCents != null
-                      ? `$${(r.expectedRateCents / 100).toLocaleString()}/h`
-                      : '-'}
+                    {r.expectedRateCents != null ? `$${(r.expectedRateCents / 100).toLocaleString()}/h` : '-'}
+                  </td>
+                  <td className="py-2">
+                    <AssignPersonSelect
+                      roleId={r.id}
+                      initialPersonId={r.assignedPerson?.id ?? null}
+                    />
                   </td>
                   <td className="py-2">{r.notes ?? '-'}</td>
                   <td className="py-2">
                     <div className="flex items-center gap-3">
-                      <EditRoleInline role={{
-                        id: r.id,
-                        roleName: r.roleName,
-                        startDate: r.startDate as any,
-                        endDate: r.endDate as any,
-                        allocationPct: r.allocationPct,
-                        billable: r.billable,
-                        expectedRateCents: r.expectedRateCents,
-                        notes: r.notes,
-                      }} />
+                      <EditRoleInline
+                        role={{
+                          id: r.id,
+                          roleName: r.roleName,
+                          startDate: r.startDate as any,
+                          endDate: r.endDate as any,
+                          allocationPct: r.allocationPct,
+                          billable: r.billable,
+                          expectedRateCents: r.expectedRateCents,
+                          notes: r.notes,
+                        }}
+                      />
                       <DeleteRoleButton id={r.id} />
                     </div>
                   </td>

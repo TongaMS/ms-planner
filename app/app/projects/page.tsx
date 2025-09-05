@@ -1,78 +1,70 @@
+// app/projects/page.tsx
 import { db } from '@/lib/db';
 import SyncButton from './SyncButton';
-import Filters from './Filters';
+
+function labelType(t: string | null | undefined) {
+  if (!t) return '-';
+  return t.replaceAll('_', ' ');
+}
 
 export const dynamic = 'force-dynamic';
 
-function HarvestBadge() {
-  return (
-    <span className="ml-2 inline-block text-[10px] px-2 py-[2px] rounded-full border border-amber-400 text-amber-700 bg-amber-50 align-middle">
-      Harvest
-    </span>
-  );
-}
-
-export default async function ProjectsPage({
-  searchParams,
-}: {
-  searchParams?: { active?: string; clientId?: string };
-}) {
-  const active = (searchParams?.active ?? 'active').toLowerCase(); // 'active' | 'all'
-  const clientId = searchParams?.clientId ?? '';
-
-  // Clients for the filter dropdown
-  const clients = await db.client.findMany({
-    orderBy: { name: 'asc' },
-    select: { id: true, name: true },
-  });
-
-  const where: any = {};
-  if (active === 'active') where.isActive = true;
-  if (clientId) where.clientId = clientId;
-
+export default async function ProjectsPage() {
   const items = await db.project.findMany({
-    where,
-    orderBy: [{ createdAt: 'desc' }],
-    include: { client: true },
+    where: { tenantId: 'harvest-default-tenant' }, // 🔑 filter only Harvest tenant
+    orderBy: { createdAt: 'desc' },
+    include: { client: { select: { name: true } } },
   });
 
   return (
-    <main className="p-8 text-neutral-900">
-      <h1 className="text-2xl font-semibold mb-2">Projects</h1>
+    <main className="space-y-6 p-8">
+      <header className="flex items-center justify-between">
+        <h1 className="text-2xl font-semibold">Projects</h1>
+        <SyncButton />
+      </header>
 
-      <SyncButton />
-      <Filters clients={clients} />
-
-      <table className="w-full text-sm border-separate border-spacing-y-1">
-        <thead>
-          <tr className="text-left text-neutral-700">
-            <th className="py-2">Name</th>
-            <th className="py-2">Client</th>
-            <th className="py-2">Status</th>
-          </tr>
-        </thead>
-        <tbody>
-          {items.map((p) => (
-            <tr key={p.id} className="bg-white">
-              <td className="py-3 px-3">
-                <a href={`/projects/${p.id}`} className="text-blue-700 underline hover:text-blue-500">
-                  {p.name ?? p.harvestName ?? '(unnamed)'}
-                </a>
-                {p.harvestId != null && <HarvestBadge />}
-              </td>
-              <td className="py-3 px-3">{p.client?.name ?? '-'}</td>
-              <td className="py-3 px-3">{p.isActive ? 'Active' : 'Inactive'}</td>
-            </tr>
-          ))}
-          {items.length === 0 && (
+      <div className="overflow-x-auto rounded-lg bg-white shadow-sm">
+        <table className="w-full text-sm">
+          <thead className="bg-neutral-50 text-neutral-600">
             <tr>
-              <td colSpan={3} className="py-6 text-center text-neutral-500">
-                No projects match your filters.
-              </td>
+              <th className="px-4 py-2 text-left">Name</th>
+              <th className="px-4 py-2 text-left">Client</th>
+              <th className="px-4 py-2 text-left">Type</th>
+              <th className="px-4 py-2 text-left">Status</th>
             </tr>
-          )}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {items.length === 0 ? (
+              <tr>
+                <td colSpan={4} className="px-4 py-6 text-center text-neutral-500">
+                  No projects found. Try syncing from Harvest.
+                </td>
+              </tr>
+            ) : (
+              items.map((p) => (
+                <tr
+                  key={p.id}
+                  className="border-t hover:bg-neutral-50 transition-colors"
+                >
+                  <td className="px-4 py-2">
+                    <a
+                      href={`/projects/${p.id}`}
+                      className="text-blue-600 hover:underline"
+                    >
+                      {p.name ?? p.harvestName ?? '(unnamed)'}
+                    </a>
+                  </td>
+                  <td className="px-4 py-2">{p.client?.name ?? '-'}</td>
+                  <td className="px-4 py-2">{labelType((p as any).type)}</td>
+                  <td className="px-4 py-2">
+                    {(p as any).isActive ? 'Active' : 'Inactive'}
+                  </td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+      </div>
     </main>
   );
 }

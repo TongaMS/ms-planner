@@ -1,56 +1,55 @@
+// app/projects/SyncButton.tsx
 'use client';
+
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 
 export default function SyncButton() {
   const [busy, setBusy] = useState(false);
-  const [msg, setMsg] = useState<string|undefined>();
+  const [msg, setMsg] = useState<string | null>(null);
+  const router = useRouter();
 
-  async function doSync(full: boolean) {
+  async function syncNow() {
+    if (busy) return;
     setBusy(true);
-    setMsg(undefined);
-    const url = full ? '/api/harvest/import?full=1' : '/api/harvest/import';
-    const res = await fetch(url, { method: 'POST' });
-    let text = '';
-    try { text = await res.text(); } catch {}
-    let json: any = {};
-    try { json = text ? JSON.parse(text) : {}; } catch { json = {}; }
-
-    const counts =
-      json?.summary?.afterCounts
-        ? json.summary.afterCounts
-        : json?.imported; // older version
-
-    if (res.ok) {
-      const fetched =
-        (json?.steps?.reduce?.((sum: number, s: any) => sum + (s.fetched || 0), 0)) ??
-        0;
-
-      setMsg(
-        `Imported ${fetched} items` +
-        (counts ? ` • Totals — clients: ${counts.clients ?? '-'}, projects: ${counts.projects ?? '-'}, people: ${counts.people ?? '-'}` : '')
-      );
-      // reload only if something changed
-      if (fetched > 0) window.location.reload();
-    } else {
-      setMsg(`Error ${res.status}: ${json?.detail ?? res.statusText}`);
+    setMsg(null);
+    try {
+      const res = await fetch('/api/harvest/import', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        cache: 'no-store',
+      });
+      if (!res.ok) {
+        const t = await res.text();
+        throw new Error(t || `HTTP ${res.status}`);
+      }
+      setMsg('Synced ✓');
+      router.refresh(); // re-fetch server component data
+    } catch (e: any) {
+      setMsg(`Sync failed: ${e?.message || 'Unknown error'}`);
+    } finally {
+      setBusy(false);
     }
-    setBusy(false);
   }
 
   return (
-    <div className="mb-4 flex items-center gap-3">
+    <div className="flex items-center gap-3">
       <button
-        onClick={(e) => doSync(e.altKey || e.metaKey)}
+        onClick={syncNow}
         disabled={busy}
-        title="Click to sync changes from Harvest. Hold Alt/Option (or ⌘) for a full sync."
-        className="rounded bg-emerald-600 text-white px-3 py-2 disabled:opacity-60"
+        className="inline-flex items-center justify-center rounded-xl bg-blue-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:brightness-95 disabled:opacity-60"
       >
-        {busy ? 'Syncing…' : 'Sync Harvest'}
+        {busy ? 'Syncing…' : 'Sync from Harvest'}
       </button>
-      <span className="text-xs text-neutral-500">
-        Tip: hold <kbd className="border px-1 rounded">Alt</kbd> for full sync
-      </span>
-      {msg && <p className="text-sm text-neutral-700">{msg}</p>}
+      {msg && (
+        <span
+          className={`text-sm ${
+            msg.startsWith('Sync failed') ? 'text-red-600' : 'text-green-600'
+          }`}
+        >
+          {msg}
+        </span>
+      )}
     </div>
   );
 }
